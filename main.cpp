@@ -385,8 +385,13 @@ int main(int argc, char const *argv[])
       if (mouseConstraint) {
          int x, y;
          SDL_GetMouseState(&x, &y);
-         SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF );  
+
          SDL_RenderDrawLine(renderer, x, y, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y);
+
+
+         aalineRGBA(renderer, x, y, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y, 0x00, 0xFF, 0x00, 0xFF * 0.5);
+
+
          filledCircleRGBA(renderer, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y, 2, 0x00,
                           0xFF, 0x00, 255);
          filledCircleRGBA(renderer, x, y, 2, 0x00, 0xFF, 0x00, 255);
