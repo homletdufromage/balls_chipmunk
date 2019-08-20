@@ -357,7 +357,6 @@ int main(int argc, char const *argv[])
       // Render balls
       for(unsigned i = 0; i < balls.size(); i++) {
          balls[i].setPosition(cpBodyGetPosition(balls[i].getBody() ).x, cpBodyGetPosition(balls[i].getBody()).y);
-         //printf("Position %d : (%f, %f)\n", i, cpBodyGetPosition(balls[i].getBody() ).x, cpBodyGetPosition(balls[i].getBody()).y);
 
          SDL_SetRenderDrawColor(renderer, balls[i].getColor().r, balls[i].getColor().g, balls[i].getColor().b, balls[i].getColor().a);
 
@@ -369,6 +368,7 @@ int main(int argc, char const *argv[])
       // Update screen
       SDL_RenderPresent(renderer);
 
+      // Step
       cpSpaceStep(space, timeStep);
 
       // Keeping <SCREEN_FPS> FPS
