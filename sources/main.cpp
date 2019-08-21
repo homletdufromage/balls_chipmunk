@@ -9,287 +9,14 @@
 #include <vector>
 #include <sstream>
 #include "SDL2_gfx/SDL2_gfxPrimitives.h"
-
-// Texture ==================================================================== 
-class Texture {
-	public:
-		// Initialise les variables
-		Texture();
-
-		// Désalloue la mémoire
-		~Texture();
-
-      bool initFont(std::string fontFile);
-
-		//Creates image from font string
-      bool loadFromRenderedText(std::string textureText, SDL_Color textColor, SDL_Renderer* renderer);
-
-		// Désalloue la mémoire de la texture
-		void free();
-
-		// Change le modificateur de couleur
-		void setColor(Uint8 red, Uint8 green, Uint8 blue);
-
-		//Set blending
-      void setBlendMode(SDL_BlendMode blending);
-
-		// Affiche la texture à certaines coordonnées donné
-		void render(SDL_Renderer* renderer);
-
-		// Accesseurs de la texture
-		int getWidth();
-		int getHeight();
-
-      void setPosition(int x, int y) { _x = x; _y = y; }
-
-	private:
-      TTF_Font* _font;
-		SDL_Texture* _texture;
-
-		// Dimensions de l'image
-		int _width, _height;
-      int _x, _y;
-};
-
-
-Texture::Texture() {
-	_texture = NULL;
-   _font = NULL;
-	_width = 0;
-	_height = 0;
-   _x = _y = 0;
-}
-
-Texture::~Texture() {
-	free();
-}
-
-bool Texture::initFont(std::string fontFile) {
-   _font = TTF_OpenFont("Minecraft.ttf", 20);
-   if (!_font) {
-      printf("Can't load font. Error : %s\n", TTF_GetError());
-      return false;
-   }
-   return true;
-}
-
-bool Texture::loadFromRenderedText(std::string textureText, SDL_Color textColor, SDL_Renderer* renderer) {
-	// Get rid of another loaded text if there is one
-	free();
-
-	SDL_Surface* textSurface = TTF_RenderText_Blended(_font, textureText.c_str(), textColor);
-	if (!textSurface) {
-		printf("Could not render text surface. SDL_ttf error : %s\n", TTF_GetError());
-	} else {
-		_texture = SDL_CreateTextureFromSurface(renderer, textSurface);
-		if (_texture == NULL) {
-			printf("Unable to create texture from rendered text. Error : %s\n", SDL_GetError());
-		} else {
-			_width = textSurface->w;
-			_height = textSurface->h;
-		}
-
-		SDL_FreeSurface(textSurface);
-	}
-
-	return _texture != NULL;
-}
-
-void Texture::free() {
-	if(_texture) {
-		SDL_DestroyTexture(_texture);
-		_texture = NULL;
-		_width = 0;
-		_height = 0;
-	}
-}
-
-void Texture::setColor(Uint8 red, Uint8 green, Uint8 blue) {
-	SDL_SetTextureColorMod(_texture, red, green, blue);
-}
-
-void Texture::setBlendMode(SDL_BlendMode blending) {
-	SDL_SetTextureBlendMode(_texture, blending);
-}
-
-void Texture::render(SDL_Renderer* renderer) {
-	//Set rendering space and render to the screen
-	SDL_Rect renderQuad = { _x, _y, _width, _height };
-
-	// C'est ici qu'on choisit "clip" comme "Rect" de zone
-	SDL_RenderCopyEx(renderer, _texture, NULL, &renderQuad, 0, NULL, SDL_FLIP_NONE);
-}
-
-int Texture::getWidth() {
-	return _width;
-}
-
-int Texture::getHeight() {
-	return _height;
-}
-
-// Timer ======================================================================
-class Timer {
-	public:
-		Timer();
-
-		void start();
-        void stop();
-        void pause();
-        void unpause();
-
-        //Gets the timer's time
-        Uint32 getTicks();
-
-        //Checks the status of the timer
-        bool isStarted();
-        bool isPaused();
-
-    private:
-        //The clock time when the timer started
-        Uint32 mStartTicks;
-
-        //The ticks stored when the timer was paused
-        Uint32 mPausedTicks;
-
-        //The timer status
-        bool mPaused;
-        bool mStarted;
-};
-
-Timer::Timer()
-{
-    //Initialize the variables
-    mStartTicks = 0;
-    mPausedTicks = 0;
-
-    mPaused = false;
-    mStarted = false;
-}
-
-void Timer::start() {
-	mStarted = true;
-
-	mPaused = false;
-
-	mStartTicks = SDL_GetTicks();
-	mPausedTicks = 0;
-}
-
-void Timer::stop()
-{
-    //Stop the timer
-    mStarted = false;
-
-    //Unpause the timer
-    mPaused = false;
-
-    //Clear tick variables
-    mStartTicks = 0;
-    mPausedTicks = 0;
-}
-
-void Timer::pause()
-{
-    //If the timer is running and isn't already paused
-    if( mStarted && !mPaused )
-    {
-        //Pause the timer
-        mPaused = true;
-
-        //Calculate the paused ticks
-        mPausedTicks = SDL_GetTicks() - mStartTicks;
-        mStartTicks = 0;
-    }
-}
-
-void Timer::unpause()
-{
-    //If the timer is running and paused
-    if( mStarted && mPaused )
-    {
-        //Unpause the timer
-        mPaused = false;
-
-        //Reset the starting ticks
-        mStartTicks = SDL_GetTicks() - mPausedTicks;
-
-        //Reset the paused ticks
-        mPausedTicks = 0;
-    }
-}
-
-Uint32 Timer::getTicks() {
-	Uint32 time = 0;
-
-	if (mStarted) {
-		if (mPaused)
-			time = mPausedTicks;
-		else
-			time = SDL_GetTicks() - mStartTicks;
-	}
-
-	return time;
-}
-
-bool Timer::isStarted()
-{
-    //Timer is running and paused or unpaused
-    return mStarted;
-}
-
-bool Timer::isPaused()
-{
-    //Timer is running and paused
-    return mPaused && mStarted;
-}
+#include "Texture.h"
+#include "Ball.h"
 
 // Constants ==================================================================
 
 const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
 const bool BALLS_AS_POINTS = false;
-
-// Structures =================================================================
-
-typedef struct vect_t {
-   int x, y;
-} Vect;
-
-typedef struct segment_t {
-   cpVect a, b;
-} Segment;
-
-// Classes ====================================================================
-
-class Ball {
-   public:
-      Ball(Vect pos, const int radius, const int mass, const SDL_Color c):
-         _position(pos), _radius(radius), _mass(mass), _color(c) {};
-      
-      // Accessors
-      void setPosition(int x, int y) { _position = {x, y}; }
-      Vect getPosition() const { return _position; }
-
-      int getRadius() const { return _radius; }
-      SDL_Color getColor() const { return _color; }
-      int getMass() const { return _mass; }
-
-      cpBody* getBody() const { return _body; }
-      void setBody(cpBody* body) { _body = body; }
-
-      cpShape* getShape() const { return _shape; }
-      void setShape(cpShape* shape) { _shape = shape; }
-
-      void render(SDL_Renderer* renderer);
-   private:
-      Vect _position;
-      const int _radius;
-      const int _mass;
-      const SDL_Color _color;
-      cpBody* _body;
-      cpShape* _shape;
-};
 
 // Functions declarations =====================================================
 
@@ -337,16 +64,6 @@ void addBall(std::vector<Ball>* balls_list, Ball& ball, cpSpace* space);
  * @param balls balls vector
  */
 void clearSpace(cpSpace* space, std::vector<Ball>* balls);
-
-/**
- * @brief Applies a rotation of <angle> radian degrees to the given point
- * around the given center
- * 
- * @param point address of the point on which apply the rotation
- * @param center center around which the point rotates
- * @param angle in radians
- */
-void applyRotationAroundCenter(cpVect* point, cpVect center, float angle);
 
 // Functions definitions ======================================================
 
@@ -421,49 +138,6 @@ void close(SDL_Window** window, SDL_Renderer** renderer) {
    SDL_Quit();
 }
 
-void applyRotationAroundCenter(cpVect* point, cpVect center, float angle) {
-   float tempX = point->x - center.x;
-   float tempY = point->y - center.y;
-
-   float rotatedX = tempX * cos(angle) - tempY * sin(angle);
-   float rotatedY = tempX * sin(angle) + tempY * cos(angle);
-
-   point->x = rotatedX + center.x;
-   point->y = rotatedY + center.y;         
-}
-
-
-void Ball::render(SDL_Renderer* renderer) {
-   _position.x = cpBodyGetPosition(_body).x;
-   _position.y = cpBodyGetPosition(_body).y;
-   if (BALLS_AS_POINTS) {
-      SDL_SetRenderDrawColor(renderer, _color.r, _color.g, _color.b, _color.a);
-      SDL_RenderDrawPoint(renderer, _position.x, _position.y);
-   } else {
-      SDL_SetRenderDrawColor(renderer, _color.r, _color.g, _color.b, _color.a);
-
-      filledCircleRGBA(renderer, _position.x, _position.y, _radius, _color.r,
-                     _color.g, _color.b, 255 * 0.5 );
-      aacircleColor(renderer, _position.x, _position.y, _radius, 0xFFFFFFFF);
-
-
-      // X:Y axis on the ball 
-      cpVect center, point1, point2;
-      center = { (cpFloat) _position.x, (cpFloat) _position.y };
-      point1 = { (cpFloat) _position.x, (cpFloat) _position.y - (cpFloat) _radius * 0.7 };
-      point2 = { (cpFloat) _position.x + _radius * 0.7, (cpFloat) _position.y };
-      applyRotationAroundCenter(&point1, center, cpBodyGetAngle(_body));
-      applyRotationAroundCenter(&point2, center, cpBodyGetAngle(_body));
-
-      aalineRGBA(renderer, _position.x, _position.y, point1.x, point1.y, 0x00, 0x00, 0xFF, 0xFF * 0.8);
-
-      aalineRGBA(renderer, _position.x, _position.y, point2.x, point2.y, 0xFF, 0x00, 0x00, 0xFF * 0.8);
-
-      SDL_SetRenderDrawColor(renderer, 0X00, 0xFF, 0x00, 0xFF);
-      SDL_RenderDrawPoint(renderer, _position.x, _position.y);
-   }
-}
-
 float calculateNorm(cpVect point1, cpVect point2) {
    cpFloat diff_x = pow(point2.x - point1.x, 2);
    cpFloat diff_y = pow(point2.y - point1.y, 2);
@@ -518,7 +192,7 @@ int main(int argc, char const *argv[])
    if (!init(&window, &renderer))
       quit = true;
    
-   if (!textTexture.initFont("Minecraft.ttf"))
+   if (!textTexture.initFont("sources/Minecraft.ttf"))
       return false;
 
    // Initialization of the text
@@ -566,10 +240,8 @@ int main(int argc, char const *argv[])
    const float SCREEN_TICKS_PER_FRAME = 1000.0 / SCREEN_FPS;
    cpFloat timeStep = 1.0/SCREEN_FPS;
    Uint32 startTicks, ticksDifference;
-   Timer fpsTimer;
    std::stringstream fpsText;
    int countedFrames = 0;
-   fpsTimer.start();
 
    // Main loop
    while (!quit) {
@@ -682,7 +354,8 @@ int main(int argc, char const *argv[])
       }
 
       // Render text
-      float avgFPS = countedFrames / (fpsTimer.getTicks() / 1000.0);
+      // TODO: make a not shity FPS counter
+      float avgFPS = countedFrames / (startTicks / 1000.0);
       if (avgFPS > 2000000)
          avgFPS = 0;
       
