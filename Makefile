@@ -8,7 +8,7 @@ LD=g++
 # flags
 # ----------
 CPPFLAGS=--pedantic -Wall -W -Wno-unused-parameter
-LDFLAGS=-lSDL2 -lSDL2_image -lchipmunk  -lSDL2_gfx -L.
+LDFLAGS=-lSDL2 -lSDL2_image -lSDL2_ttf -lchipmunk  -lSDL2_gfx -L.
 #-lSDL2_gfx
 
 # ----------

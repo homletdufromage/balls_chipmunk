@@ -1,17 +1,254 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <chipmunk/chipmunk.h>
+#include <SDL2/SDL_ttf.h>
+#include "chipmunk/chipmunk.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <iostream>
 #include <vector>
+#include <sstream>
 #include "SDL2_gfx/SDL2_gfxPrimitives.h"
+
+// Texture ==================================================================== 
+class Texture {
+	public:
+		// Initialise les variables
+		Texture();
+
+		// Désalloue la mémoire
+		~Texture();
+
+      bool initFont(std::string fontFile);
+
+		//Creates image from font string
+      bool loadFromRenderedText(std::string textureText, SDL_Color textColor, SDL_Renderer* renderer);
+
+		// Désalloue la mémoire de la texture
+		void free();
+
+		// Change le modificateur de couleur
+		void setColor(Uint8 red, Uint8 green, Uint8 blue);
+
+		//Set blending
+      void setBlendMode(SDL_BlendMode blending);
+
+		// Affiche la texture à certaines coordonnées donné
+		void render(SDL_Renderer* renderer);
+
+		// Accesseurs de la texture
+		int getWidth();
+		int getHeight();
+
+      void setPosition(int x, int y) { _x = x; _y = y; }
+
+	private:
+      TTF_Font* _font;
+		SDL_Texture* _texture;
+
+		// Dimensions de l'image
+		int _width, _height;
+      int _x, _y;
+};
+
+
+Texture::Texture() {
+	_texture = NULL;
+   _font = NULL;
+	_width = 0;
+	_height = 0;
+   _x = _y = 0;
+}
+
+Texture::~Texture() {
+	free();
+}
+
+bool Texture::initFont(std::string fontFile) {
+   _font = TTF_OpenFont("Minecraft.ttf", 20);
+   if (!_font) {
+      printf("Can't load font. Error : %s\n", TTF_GetError());
+      return false;
+   }
+   return true;
+}
+
+bool Texture::loadFromRenderedText(std::string textureText, SDL_Color textColor, SDL_Renderer* renderer) {
+	// Get rid of another loaded text if there is one
+	free();
+
+	SDL_Surface* textSurface = TTF_RenderText_Blended(_font, textureText.c_str(), textColor);
+	if (!textSurface) {
+		printf("Could not render text surface. SDL_ttf error : %s\n", TTF_GetError());
+	} else {
+		_texture = SDL_CreateTextureFromSurface(renderer, textSurface);
+		if (_texture == NULL) {
+			printf("Unable to create texture from rendered text. Error : %s\n", SDL_GetError());
+		} else {
+			_width = textSurface->w;
+			_height = textSurface->h;
+		}
+
+		SDL_FreeSurface(textSurface);
+	}
+
+	return _texture != NULL;
+}
+
+void Texture::free() {
+	if(_texture) {
+		SDL_DestroyTexture(_texture);
+		_texture = NULL;
+		_width = 0;
+		_height = 0;
+	}
+}
+
+void Texture::setColor(Uint8 red, Uint8 green, Uint8 blue) {
+	SDL_SetTextureColorMod(_texture, red, green, blue);
+}
+
+void Texture::setBlendMode(SDL_BlendMode blending) {
+	SDL_SetTextureBlendMode(_texture, blending);
+}
+
+void Texture::render(SDL_Renderer* renderer) {
+	//Set rendering space and render to the screen
+	SDL_Rect renderQuad = { _x, _y, _width, _height };
+
+	// C'est ici qu'on choisit "clip" comme "Rect" de zone
+	SDL_RenderCopyEx(renderer, _texture, NULL, &renderQuad, 0, NULL, SDL_FLIP_NONE);
+}
+
+int Texture::getWidth() {
+	return _width;
+}
+
+int Texture::getHeight() {
+	return _height;
+}
+
+// Timer ======================================================================
+class Timer {
+	public:
+		Timer();
+
+		void start();
+        void stop();
+        void pause();
+        void unpause();
+
+        //Gets the timer's time
+        Uint32 getTicks();
+
+        //Checks the status of the timer
+        bool isStarted();
+        bool isPaused();
+
+    private:
+        //The clock time when the timer started
+        Uint32 mStartTicks;
+
+        //The ticks stored when the timer was paused
+        Uint32 mPausedTicks;
+
+        //The timer status
+        bool mPaused;
+        bool mStarted;
+};
+
+Timer::Timer()
+{
+    //Initialize the variables
+    mStartTicks = 0;
+    mPausedTicks = 0;
+
+    mPaused = false;
+    mStarted = false;
+}
+
+void Timer::start() {
+	mStarted = true;
+
+	mPaused = false;
+
+	mStartTicks = SDL_GetTicks();
+	mPausedTicks = 0;
+}
+
+void Timer::stop()
+{
+    //Stop the timer
+    mStarted = false;
+
+    //Unpause the timer
+    mPaused = false;
+
+    //Clear tick variables
+    mStartTicks = 0;
+    mPausedTicks = 0;
+}
+
+void Timer::pause()
+{
+    //If the timer is running and isn't already paused
+    if( mStarted && !mPaused )
+    {
+        //Pause the timer
+        mPaused = true;
+
+        //Calculate the paused ticks
+        mPausedTicks = SDL_GetTicks() - mStartTicks;
+        mStartTicks = 0;
+    }
+}
+
+void Timer::unpause()
+{
+    //If the timer is running and paused
+    if( mStarted && mPaused )
+    {
+        //Unpause the timer
+        mPaused = false;
+
+        //Reset the starting ticks
+        mStartTicks = SDL_GetTicks() - mPausedTicks;
+
+        //Reset the paused ticks
+        mPausedTicks = 0;
+    }
+}
+
+Uint32 Timer::getTicks() {
+	Uint32 time = 0;
+
+	if (mStarted) {
+		if (mPaused)
+			time = mPausedTicks;
+		else
+			time = SDL_GetTicks() - mStartTicks;
+	}
+
+	return time;
+}
+
+bool Timer::isStarted()
+{
+    //Timer is running and paused or unpaused
+    return mStarted;
+}
+
+bool Timer::isPaused()
+{
+    //Timer is running and paused
+    return mPaused && mStarted;
+}
 
 // Constants ==================================================================
 
-const unsigned SCREEN_WIDTH = 800;
-const unsigned SCREEN_HEIGHT = 600;
+const int SCREEN_WIDTH = 1920;
+const int SCREEN_HEIGHT = 1080;
+const bool BALLS_AS_POINTS = false;
 
 // Structures =================================================================
 
@@ -126,7 +363,7 @@ bool init(SDL_Window** window, SDL_Renderer** renderer) {
    // Initlialization of the main window
    *window = SDL_CreateWindow("Rings and rings and rings", SDL_WINDOWPOS_CENTERED,
                               SDL_WINDOWPOS_CENTERED, SCREEN_WIDTH,
-                              SCREEN_HEIGHT, SDL_WINDOW_SHOWN);
+                              SCREEN_HEIGHT, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN_DESKTOP);
    if (!*window) {
       printf("Window could not be created. Error : %s\n", SDL_GetError());
       return false;
@@ -141,12 +378,27 @@ bool init(SDL_Window** window, SDL_Renderer** renderer) {
       return false;
    }
 
-   SDL_SetRenderDrawColor(*renderer, 0x00, 0x00, 0x00, 0xFF);
    SDL_SetRenderDrawBlendMode(*renderer, SDL_BLENDMODE_BLEND);
 
    // Initialization of the PNG pictures loader
    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
       printf("SDL_Image could not initialize. Error : %s\n", IMG_GetError());
+      return false;
+   }
+
+   // Initialization of the TTF text manager
+   if (TTF_Init() == -1) {
+      printf("SDL_TTF could not initialize. Error : %s\n", TTF_GetError());
+      return false;
+   }
+
+   return true;
+}
+
+bool loadMedia(SDL_Renderer* renderer, Texture& textTexture) {
+   SDL_Color textColor = {0xFF, 0xFF, 0xFF, 0xFF};
+   if (!textTexture.loadFromRenderedText("MODO Seal3 : Coucou les blablas ^^", textColor, renderer)) {
+      printf("Could not render text texture\n");
       return false;
    }
 
@@ -184,26 +436,32 @@ void applyRotationAroundCenter(cpVect* point, cpVect center, float angle) {
 void Ball::render(SDL_Renderer* renderer) {
    _position.x = cpBodyGetPosition(_body).x;
    _position.y = cpBodyGetPosition(_body).y;
+   if (BALLS_AS_POINTS) {
+      SDL_SetRenderDrawColor(renderer, _color.r, _color.g, _color.b, _color.a);
+      SDL_RenderDrawPoint(renderer, _position.x, _position.y);
+   } else {
+      SDL_SetRenderDrawColor(renderer, _color.r, _color.g, _color.b, _color.a);
 
-   SDL_SetRenderDrawColor(renderer, _color.r, _color.g, _color.b, _color.a);
+      filledCircleRGBA(renderer, _position.x, _position.y, _radius, _color.r,
+                     _color.g, _color.b, 255 * 0.5 );
+      aacircleColor(renderer, _position.x, _position.y, _radius, 0xFFFFFFFF);
 
-   filledCircleRGBA(renderer, _position.x, _position.y, _radius, _color.r,
-                   _color.g, _color.b, 255 * 0.5 );
-   aacircleColor(renderer, _position.x, _position.y, _radius, 0xFFFFFFFF);
 
-   cpVect center, point1, point2;
-   center = { (cpFloat) _position.x, (cpFloat) _position.y };
-   point1 = { (cpFloat) _position.x, (cpFloat) _position.y - (cpFloat) _radius * 0.7 };
-   point2 = { (cpFloat) _position.x + _radius * 0.7, (cpFloat) _position.y };
-   applyRotationAroundCenter(&point1, center, cpBodyGetAngle(_body));
-   applyRotationAroundCenter(&point2, center, cpBodyGetAngle(_body));
+      // X:Y axis on the ball 
+      cpVect center, point1, point2;
+      center = { (cpFloat) _position.x, (cpFloat) _position.y };
+      point1 = { (cpFloat) _position.x, (cpFloat) _position.y - (cpFloat) _radius * 0.7 };
+      point2 = { (cpFloat) _position.x + _radius * 0.7, (cpFloat) _position.y };
+      applyRotationAroundCenter(&point1, center, cpBodyGetAngle(_body));
+      applyRotationAroundCenter(&point2, center, cpBodyGetAngle(_body));
 
-   aalineRGBA(renderer, _position.x, _position.y, point1.x, point1.y, 0x00, 0x00, 0xFF, 0xFF * 0.5);
+      aalineRGBA(renderer, _position.x, _position.y, point1.x, point1.y, 0x00, 0x00, 0xFF, 0xFF * 0.8);
 
-   aalineRGBA(renderer, _position.x, _position.y, point2.x, point2.y, 0xFF, 0x00, 0x00, 0xFF * 0.5);
+      aalineRGBA(renderer, _position.x, _position.y, point2.x, point2.y, 0xFF, 0x00, 0x00, 0xFF * 0.8);
 
-   SDL_SetRenderDrawColor(renderer, 0X00, 0xFF, 0x00, 0xFF);
-   SDL_RenderDrawPoint(renderer, _position.x, _position.y);
+      SDL_SetRenderDrawColor(renderer, 0X00, 0xFF, 0x00, 0xFF);
+      SDL_RenderDrawPoint(renderer, _position.x, _position.y);
+   }
 }
 
 float calculateNorm(cpVect point1, cpVect point2) {
@@ -252,18 +510,23 @@ int main(int argc, char const *argv[])
    SDL_Event e;
    bool quit = false;
 
-   // FPS management
-   const float SCREEN_FPS = 120.0;
-   const float SCREEN_TICKS_PER_FRAME = 1000.0 / SCREEN_FPS;
-   cpFloat timeStep = 1.0/SCREEN_FPS;
-   Uint32 startTicks, ticksDifference;
+   // SDL_Font related stuff
+   Texture textTexture;
+   textTexture.setPosition(50, 50);
 
    // Initialization of SDL
    if (!init(&window, &renderer))
       quit = true;
+   
+   if (!textTexture.initFont("Minecraft.ttf"))
+      return false;
+
+   // Initialization of the text
+   if (!loadMedia(renderer, textTexture))
+      quit = true;
 
    // Chipmunk stuff
-   cpVect gravity = cpv(0, 500);
+   cpVect gravity = cpv(0, 1000);
 
    // Creation of the new space
    cpSpace* space = cpSpaceNew();
@@ -296,13 +559,25 @@ int main(int argc, char const *argv[])
    cpConstraint* mouseConstraint = NULL;
    int linkedBallId = -1;
 
+   unsigned NB_BALLS = 0;
+
+   // FPS management
+   const float SCREEN_FPS = 60.0;
+   const float SCREEN_TICKS_PER_FRAME = 1000.0 / SCREEN_FPS;
+   cpFloat timeStep = 1.0/SCREEN_FPS;
+   Uint32 startTicks, ticksDifference;
+   Timer fpsTimer;
+   std::stringstream fpsText;
+   int countedFrames = 0;
+   fpsTimer.start();
+
    // Main loop
    while (!quit) {
       startTicks = SDL_GetTicks();
       
       // Events manager
       while (SDL_PollEvent(&e) != 0) {
-         if (e.type == SDL_QUIT)
+         if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE))
             quit = true;
          else if (e.type == SDL_KEYDOWN) {
             switch(e.key.keysym.sym) {
@@ -313,6 +588,7 @@ int main(int argc, char const *argv[])
                      mouseConstraint = NULL;
                      linkedBallId = -1;
                   }
+                  NB_BALLS = 0;
                   clearSpace(space, &balls);
                   break;
                case SDLK_p:
@@ -322,7 +598,7 @@ int main(int argc, char const *argv[])
                case SDLK_m:
                   NB_BALLS_TO_ADD -= 10;
                   if (NB_BALLS_TO_ADD < 0)
-                     NB_BALLS_TO_ADD = 0;
+                     NB_BALLS_TO_ADD = 1;
                   printf("Nb balls to add set to %d\n", NB_BALLS_TO_ADD);
                   break;
             }
@@ -332,15 +608,19 @@ int main(int argc, char const *argv[])
             Uint32 button = SDL_GetMouseState(&x, &y);
             if (button == 1) {
                for (int i = 0; i < NB_BALLS_TO_ADD; i++) {
-                  int radius = 25, mass = 5;
+                  int radius = 30, mass = 5;
                   SDL_Color color;
                   color.r = (Uint32) (rand() % 0xFF);
                   color.g = (Uint32) (rand() % 0xFF);
                   color.b = (Uint32) (rand() % 0xFF);
                   color.a = 0xFF;
-                  Ball b({x, y}, radius, mass, color);
+                  Ball b({rand() % SCREEN_WIDTH, rand() % SCREEN_HEIGHT}, radius, mass, color);
+                  if (NB_BALLS_TO_ADD == 1)
+                     b.setPosition(x, y);
+                        
                   addBall(&balls, b, space);
                }
+               NB_BALLS += NB_BALLS_TO_ADD;
                printf("%d %s added at (%d, %d)\n", NB_BALLS_TO_ADD,
                       (NB_BALLS_TO_ADD==1)?"ball":"balls", x, y);
             }
@@ -380,6 +660,10 @@ int main(int argc, char const *argv[])
       SDL_RenderDrawLine(renderer, roof.a.x, roof.a.y, roof.b.x, roof.b.y);
       SDL_RenderDrawLine(renderer, leftWall.a.x, leftWall.a.y, leftWall.b.x, leftWall.b.y);
       SDL_RenderDrawLine(renderer, rightWall.a.x, rightWall.a.y, rightWall.b.x, rightWall.b.y);
+      
+      // Render balls
+      for(unsigned i = 0; i < balls.size(); i++)
+         balls[i].render(renderer);
 
       // Render constraints
       if (mouseConstraint) {
@@ -396,10 +680,17 @@ int main(int argc, char const *argv[])
                           0xFF, 0x00, 255);
          filledCircleRGBA(renderer, x, y, 2, 0x00, 0xFF, 0x00, 255);
       }
+
+      // Render text
+      float avgFPS = countedFrames / (fpsTimer.getTicks() / 1000.0);
+      if (avgFPS > 2000000)
+         avgFPS = 0;
       
-      // Render balls
-      for(unsigned i = 0; i < balls.size(); i++)
-         balls[i].render(renderer);
+      fpsText.str("");
+      fpsText << "Balls count : " << NB_BALLS << " - FPS : " << round(avgFPS);
+      if (!textTexture.loadFromRenderedText(fpsText.str().c_str(), {0xFF, 0xFF, 0xFF, 0xFF}, renderer))
+         printf("Could not render text\n");
+      textTexture.render(renderer);
       
       // Update screen
       SDL_RenderPresent(renderer);
@@ -408,6 +699,7 @@ int main(int argc, char const *argv[])
       cpSpaceStep(space, timeStep);
 
       // Keeping <SCREEN_FPS> FPS
+      ++ countedFrames;
       ticksDifference = SDL_GetTicks() - startTicks;
       if (ticksDifference < SCREEN_TICKS_PER_FRAME)
          SDL_Delay(SCREEN_TICKS_PER_FRAME - ticksDifference);
