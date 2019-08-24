@@ -23,6 +23,20 @@ void applyRotationAroundCenter(cpVect* point, cpVect center, float angle) {
    point->y = rotatedY + center.y;         
 }
 
+void Ball::createBody(cpSpace* space) {
+     // Moment of inertia
+   cpFloat moment = cpMomentForCircle(_mass, 0, _radius, cpvzero);
+
+   // Ball body
+   _body = cpSpaceAddBody(space, cpBodyNew(_mass, moment));
+   cpBodySetPosition(_body, cpv(_position.x, _position.y));
+
+   // Collision shape of the ball
+   _shape = cpSpaceAddShape(space, cpCircleShapeNew(_body, _radius, cpvzero));
+   cpShapeSetFriction(_shape, 0.7);
+   cpShapeSetElasticity(_shape, 0);
+}
+
 void Ball::render(SDL_Renderer* renderer) {
     _position.x = cpBodyGetPosition(_body).x;
     _position.y = cpBodyGetPosition(_body).y;

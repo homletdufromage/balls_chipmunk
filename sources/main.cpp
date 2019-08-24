@@ -16,7 +16,6 @@
 
 const int SCREEN_WIDTH = 1920;
 const int SCREEN_HEIGHT = 1080;
-const bool BALLS_AS_POINTS = false;
 
 // Functions declarations =====================================================
 
@@ -55,7 +54,7 @@ float calculateNorm(cpVect point1, cpVect point2);
  * @param ball the ball to add
  * @param space existing and initialized cpSpace
  */
-void addBall(std::vector<Ball>* balls_list, Ball& ball, cpSpace* space);
+void addBall(std::vector<Ball*>* balls_list, Ball* ball, cpSpace* space);
 
 /**
  * @brief Removes every ball from the cpSpace and clears the balls vector
@@ -63,7 +62,7 @@ void addBall(std::vector<Ball>* balls_list, Ball& ball, cpSpace* space);
  * @param space existing cpSpace
  * @param balls balls vector
  */
-void clearSpace(cpSpace* space, std::vector<Ball>* balls);
+void clearSpace(cpSpace* space, std::vector<Ball*>* balls);
 
 // Functions definitions ======================================================
 
@@ -146,32 +145,16 @@ float calculateNorm(cpVect point1, cpVect point2) {
    return sqrt(sum);
 }
 
-void addBall(std::vector<Ball>* balls_list, Ball& ball,cpSpace* space) {
-   // Moment of inertia
-   cpFloat moment = cpMomentForCircle(ball.getMass(), 0, ball.getRadius(), cpvzero);
-
-   // Ball body
-   cpBody* ballBody = cpSpaceAddBody(space, cpBodyNew(ball.getMass(), moment));
-   cpBodySetPosition(ballBody, cpv(ball.getPosition().x, ball.getPosition().y));
-   ball.setBody(ballBody);
-
-   // Collision shape of the ball
-   cpShape* ballShape = cpSpaceAddShape(space, cpCircleShapeNew(ballBody, ball.getRadius(), cpvzero));
-   cpShapeSetFriction(ballShape, 0.7);
-   cpShapeSetElasticity(ballShape, 1);
-   ball.setShape(ballShape);
-
+void addBall(std::vector<Ball*>* balls_list, Ball* ball,cpSpace* space) {
+   ball->createBody(space);
    balls_list->push_back(ball);
 }
 
-void clearSpace(cpSpace* space, std::vector<Ball>* balls) {
+void clearSpace(cpSpace* space, std::vector<Ball*>* balls) {
    for (unsigned i = 0; i < balls->size(); i++) {
-      cpSpaceRemoveShape(space, (*balls)[i].getShape());
-      cpShapeFree((*balls)[i].getShape());
-      (*balls)[i].setShape(NULL);
-      cpSpaceRemoveBody(space, (*balls)[i].getBody());
-      cpBodyFree((*balls)[i].getBody());
-      (*balls)[i].setBody(NULL);
+      cpSpaceRemoveShape(space, (*balls)[i]->getShape());
+      cpSpaceRemoveBody(space, (*balls)[i]->getBody());
+      delete (*balls)[i];
    }
    balls->clear();
 }
@@ -221,12 +204,12 @@ int main(int argc, char const *argv[])
                          
    for(int i = 0; i < NB_WALLS; i++) {
       cpShapeSetFriction(ground[i], 0.5);
-      cpShapeSetElasticity(ground[i], 1);
+      cpShapeSetElasticity(ground[i], 0);
       cpSpaceAddShape(space, ground[i]);
    }
 
    // Balls
-   std::vector<Ball> balls;
+   std::vector<Ball*> balls;
 
    // Constraint management
    int NB_BALLS_TO_ADD = 1;
@@ -246,7 +229,6 @@ int main(int argc, char const *argv[])
    // Main loop
    while (!quit) {
       startTicks = SDL_GetTicks();
-      
       // Events manager
       while (SDL_PollEvent(&e) != 0) {
          if (e.type == SDL_QUIT || (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE))
@@ -286,9 +268,9 @@ int main(int argc, char const *argv[])
                   color.g = (Uint32) (rand() % 0xFF);
                   color.b = (Uint32) (rand() % 0xFF);
                   color.a = 0xFF;
-                  Ball b({rand() % SCREEN_WIDTH, rand() % SCREEN_HEIGHT}, radius, mass, color);
+                  Ball* b = new Ball({rand() % SCREEN_WIDTH, rand() % SCREEN_HEIGHT}, mass, radius, color);
                   if (NB_BALLS_TO_ADD == 1)
-                     b.setPosition(x, y);
+                     b->setPosition(x, y);
                         
                   addBall(&balls, b, space);
                }
@@ -298,9 +280,9 @@ int main(int argc, char const *argv[])
             }
             else if (button == 4) {
                for (Uint32 i = 0; i < balls.size(); i++) {
-                  if (calculateNorm(cpv(x, y), cpv(balls[i].getPosition().x, balls[i].getPosition().y)) <= balls[i].getRadius()) {
+                  if (calculateNorm(cpv(x, y), cpv(balls[i]->getPosition().x, balls[i]->getPosition().y)) <= balls[i]->getRadius()) {
                      linkedBallId = i;
-                     mouseConstraint = cpPivotJointNew(balls[i].getBody(), cpSpaceGetStaticBody(space), cpv(x, y));
+                     mouseConstraint = cpPivotJointNew(balls[i]->getBody(), cpSpaceGetStaticBody(space), cpv(x, y));
                      cpSpaceAddConstraint(space, mouseConstraint);
                      break;
                   }
@@ -334,21 +316,30 @@ int main(int argc, char const *argv[])
       SDL_RenderDrawLine(renderer, rightWall.a.x, rightWall.a.y, rightWall.b.x, rightWall.b.y);
       
       // Render balls
-      for(unsigned i = 0; i < balls.size(); i++)
-         balls[i].render(renderer);
+      for(unsigned i = 0; i < balls.size(); i++) {
+         if (balls[i]->getPosition().x > SCREEN_WIDTH || balls[i]->getPosition().x < 0
+             || balls[i]->getPosition().y > SCREEN_HEIGHT || balls[i]->getPosition().y < 0){
+               cpSpaceRemoveShape(space, balls[i]->getShape());
+               cpSpaceRemoveBody(space, balls[i]->getBody());
+               delete balls[i];
+               balls.erase(balls.begin() + i);
+            }
+         else
+            balls[i]->render(renderer);
+      }
 
       // Render constraints
       if (mouseConstraint) {
          int x, y;
          SDL_GetMouseState(&x, &y);
 
-         SDL_RenderDrawLine(renderer, x, y, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y);
+         SDL_RenderDrawLine(renderer, x, y, balls[linkedBallId]->getPosition().x, balls[linkedBallId]->getPosition().y);
 
 
-         aalineRGBA(renderer, x, y, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y, 0x00, 0xFF, 0x00, 0xFF * 0.5);
+         aalineRGBA(renderer, x, y, balls[linkedBallId]->getPosition().x, balls[linkedBallId]->getPosition().y, 0x00, 0xFF, 0x00, 0xFF * 0.5);
 
 
-         filledCircleRGBA(renderer, balls[linkedBallId].getPosition().x, balls[linkedBallId].getPosition().y, 2, 0x00,
+         filledCircleRGBA(renderer, balls[linkedBallId]->getPosition().x, balls[linkedBallId]->getPosition().y, 2, 0x00,
                           0xFF, 0x00, 255);
          filledCircleRGBA(renderer, x, y, 2, 0x00, 0xFF, 0x00, 255);
       }
@@ -360,7 +351,7 @@ int main(int argc, char const *argv[])
          avgFPS = 0;
       
       fpsText.str("");
-      fpsText << "Balls count : " << NB_BALLS << " - FPS : " << round(avgFPS);
+      fpsText << "Balls count : " << balls.size() << " - FPS : " << round(avgFPS);
       if (!textTexture.loadFromRenderedText(fpsText.str().c_str(), {0xFF, 0xFF, 0xFF, 0xFF}, renderer))
          printf("Could not render text\n");
       textTexture.render(renderer);
